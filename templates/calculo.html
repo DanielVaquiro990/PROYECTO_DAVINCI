@@ -192,6 +192,9 @@
 
         let ecuacionStr = `A=${ecuacion.A}, B=${ecuacion.B}, C=${ecuacion.C}, D=${ecuacion.D}, E=${ecuacion.E}, F=${ecuacion.F}, G=${ecuacion.G}, H=${ecuacion.H}, I=${ecuacion.I}, J=${ecuacion.J}`;
 
+        // Generar URL de la gráfica
+        const graficaUrl = `/simulation/graficar_superficie?A=${ecuacion.A}&B=${ecuacion.B}&C=${ecuacion.C}&D=${ecuacion.D}&E=${ecuacion.E}&F=${ecuacion.F}&G=${ecuacion.G}&H=${ecuacion.H}&I=${ecuacion.I}&J=${ecuacion.J}`;
+
         let resultadoHTML = `
             <h5>📊 Resultados del Cálculo Vectorial</h5>
             <div style="background-color: #0d6efd; color: white; padding: 20px; border-radius: 8px; margin-bottom: 15px;">
@@ -205,7 +208,7 @@
 
         if (evaluacion) {
             resultadoHTML += `
-                <div style="background-color: #198754; color: white; padding: 20px; border-radius: 8px;">
+                <div style="background-color: #198754; color: white; padding: 20px; border-radius: 8px; margin-bottom: 15px;">
                     <h6>📍 Evaluación del Punto</h6>
                     <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
                         <li><strong>Punto evaluado:</strong> ${evaluacion.punto}</li>
@@ -215,6 +218,16 @@
                 </div>
             `;
         }
+
+        // Agregar gráfica 3D
+        resultadoHTML += `
+            <div style="background-color: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
+                <h6>📊 Visualización 3D de la Superficie</h6>
+                <div class="text-center">
+                    <img src="${graficaUrl}" alt="Gráfica 3D de la superficie" class="img-fluid rounded" style="max-width: 100%;" />
+                </div>
+            </div>
+        `;
 
         document.getElementById('resultado-emergente').innerHTML = resultadoHTML;
         document.getElementById('resultado-emergente').style.display = 'block';
@@ -256,6 +269,14 @@
         const registro = registrosData[indice];
         if (!registro) return;
 
+        // Parsear ecuación para generar gráfica
+        const ecuacionMatch = registro.Ecuacion.match(/{'A': ([-\d.]+), 'B': ([-\d.]+), 'C': ([-\d.]+), 'D': ([-\d.]+), 'E': ([-\d.]+), 'F': ([-\d.]+), 'G': ([-\d.]+), 'H': ([-\d.]+), 'I': ([-\d.]+), 'J': ([-\d.]+)}/);
+
+        let graficaUrl = '';
+        if (ecuacionMatch) {
+            graficaUrl = `/simulation/graficar_superficie?A=${ecuacionMatch[1]}&B=${ecuacionMatch[2]}&C=${ecuacionMatch[3]}&D=${ecuacionMatch[4]}&E=${ecuacionMatch[5]}&F=${ecuacionMatch[6]}&G=${ecuacionMatch[7]}&H=${ecuacionMatch[8]}&I=${ecuacionMatch[9]}&J=${ecuacionMatch[10]}`;
+        }
+
         const resultadoHTML = `
             <h5>📋 Visualización de Registro #${indice + 1}</h5>
             <div style="background-color: #0d6efd; color: white; padding: 20px; border-radius: 8px; margin-bottom: 15px;">
@@ -265,7 +286,7 @@
                     <li><strong>Tipo de Superficie:</strong> ${registro.Tipo_Superficie}</li>
                 </ul>
             </div>
-            <div style="background-color: #198754; color: white; padding: 20px; border-radius: 8px;">
+            <div style="background-color: #198754; color: white; padding: 20px; border-radius: 8px; margin-bottom: 15px;">
                 <h6>📍 Evaluación del Punto</h6>
                 <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
                     <li><strong>Punto evaluado:</strong> ${registro.Punto}</li>
@@ -273,6 +294,14 @@
                     <li><strong>¿Está en la superficie?:</strong> ${registro.En_Superficie}</li>
                 </ul>
             </div>
+            ${graficaUrl ? `
+            <div style="background-color: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
+                <h6>📊 Gráfica 3D de la Superficie</h6>
+                <div class="text-center">
+                    <img src="${graficaUrl}" alt="Gráfica 3D" class="img-fluid rounded" style="max-width: 100%;" />
+                </div>
+            </div>
+            ` : ''}
         `;
 
         document.getElementById('resultado-emergente').innerHTML = resultadoHTML;

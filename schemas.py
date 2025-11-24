@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, ClassVar
+import math
 
 class Fuerza(BaseModel):
     tipo: str
@@ -38,3 +39,26 @@ class PuntoEvaluacion(BaseModel):
     x: float
     y: float
     z: float
+    RADIO_CUADRADO: ClassVar[float] = 25.0
+
+    def pertenece_a_ecuacion(self) -> bool:
+        valor_calculado = self.x*2 + self.y2 + self.z*2
+        TOLERANCIA = 1e-6
+        return abs(valor_calculado - self.RADIO_CUADRADO) < TOLERANCIA
+
+    def distancia_a_ecuacion(self) -> float:
+        magnitud_punto = math.sqrt(self.x*2 + self.y2 + self.z*2)
+        radio = math.sqrt(self.RADIO_CUADRADO)
+        return abs(magnitud_punto - radio)
+
+punto_dentro = PuntoEvaluacion(x=3.0, y=4.0, z=0.0)
+print(f"Punto ({punto_dentro.x}, {punto_dentro.y}, {punto_dentro.z}):")
+print(f"¿Pertenece? {punto_dentro.pertenece_a_ecuacion()}")
+print(f"Distancia: {punto_dentro.distancia_a_ecuacion()}")
+
+print("-" * 20)
+
+punto_fuera = PuntoEvaluacion(x=5.0, y=5.0, z=0.0)
+print(f"Punto ({punto_fuera.x}, {punto_fuera.y}, {punto_fuera.z}):")
+print(f"¿Pertenece? {punto_fuera.pertenece_a_ecuacion()}")
+print(f"Distancia: {punto_fuera.distancia_a_ecuacion()}")

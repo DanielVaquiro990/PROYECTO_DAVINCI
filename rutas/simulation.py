@@ -1,9 +1,13 @@
 from fastapi import APIRouter, HTTPException, Request, Form
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from typing import Dict, Any, List, Tuple
 import os
 import csv
+import io
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import numpy as np
 
 
 # Tu código integrado
@@ -121,7 +125,95 @@ def eliminar_registro_calculo(indice: int):
         writer.writerows(registros)
 
 
-# Código de tu amigo integrado
+def generar_grafica_3d(ecuacion: Dict[str, float]):
+    A, B, C, D, E, F, G, H, I, J = (
+        ecuacion.get(c, 0) for c in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
+    )
+
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Rango para la malla
+    x = np.linspace(-10, 10, 50)
+    y = np.linspace(-10, 10, 50)
+    X, Y = np.meshgrid(x, y)
+
+    # Determinar el tipo de superficie y calcular Z
+    try:
+        if C != 0:
+            # Caso general: Despejamos Z de la ecuación cuadrática
+            # C*z² + I*z + (A*x² + B*y² + D*xy + E*xz + F*yz + G*x + H*y + J) = 0
+            # Simplificamos asumiendo E=F=0 (no hay términos xz, yz)
+
+            if E == 0 and F == 0:
+                # Ecuación cuadrática en z: C*z² + I*z + resto = 0
+                resto = A * X ** 2 + B * Y ** 2 + D * X * Y + G * X + H * Y + J
+
+                # Fórmula cuadrática: z = (-I ± √(I² - 4*C*resto)) / (2*C)
+                discriminante = I ** 2 - 4 * C * resto
+
+                # Solo graficamos donde el discriminante es positivo
+                Z_positivo = np.where(discriminante >= 0,
+                                      (-I + np.sqrt(np.maximum(discriminante, 0))) / (2 * C),
+                                      np.nan)
+                Z_negativo = np.where(discriminante >= 0,
+                                      (-I - np.sqrt(np.maximum(discriminante, 0))) / (2 * C),
+                                      np.nan)
+
+                # Graficar ambas ramas (superior e inferior)
+                ax.plot_surface(X, Y, Z_positivo, alpha=0.7, cmap='viridis', edgecolor='none')
+                ax.plot_surface(X, Y, Z_negativo, alpha=0.7, cmap='plasma', edgecolor='none')
+            else:
+                # Caso con términos mixtos (más complejo)
+                Z = (-A * X ** 2 - B * Y ** 2 - D * X * Y - G * X - H * Y - J) / C
+                ax.plot_surface(X, Y, Z, alpha=0.7, cmap='viridis', edgecolor='none')
+
+        elif B != 0:
+            # Despejamos Y si C=0
+            Y_calc = (-A * X ** 2 - G * X - J) / B
+            Z_range = np.linspace(-10, 10, 50)
+            X_mesh, Z_mesh = np.meshgrid(x, Z_range)
+            Y_mesh = (-A * X_mesh ** 2 - G * X_mesh - J) / B
+            ax.plot_surface(X_mesh, Y_mesh, Z_mesh, alpha=0.7, cmap='viridis', edgecolor='none')
+
+        elif A != 0:
+            # Despejamos X si B=C=0
+            X_calc = (-G - np.sqrt(np.maximum(G ** 2 - 4 * A * J, 0))) / (2 * A)
+            Y_range = np.linspace(-10, 10, 50)
+            Z_range = np.linspace(-10, 10, 50)
+            Y_mesh, Z_mesh = np.meshgrid(Y_range, Z_range)
+            X_mesh = np.full_like(Y_mesh, X_calc)
+            ax.plot_surface(X_mesh, Y_mesh, Z_mesh, alpha=0.7, cmap='viridis', edgecolor='none')
+
+        else:
+            # Plano o superficie degenerada
+            Z = np.zeros_like(X)
+            ax.plot_surface(X, Y, Z, alpha=0.5, cmap='gray', edgecolor='none')
+
+    except Exception as e:
+        print(f"Error al generar gráfica: {e}")
+        # Fallback: superficie plana
+        Z = np.zeros_like(X)
+        ax.plot_surface(X, Y, Z, alpha=0.5, cmap='gray', edgecolor='none')
+
+    # Configuración de ejes
+    ax.set_xlabel('Eje X', fontsize=10)
+    ax.set_ylabel('Eje Y', fontsize=10)
+    ax.set_zlabel('Eje Z', fontsize=10)
+    ax.set_title('Superficie Cónica 3D', fontsize=12, fontweight='bold')
+
+    # Ajustar límites de ejes para mejor visualización
+    ax.set_xlim([-10, 10])
+    ax.set_ylim([-10, 10])
+    ax.set_zlim([-10, 10])
+
+    # Guardar en buffer
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+    return buf
+
 router = APIRouter()
 
 templates_engine = Jinja2Templates(directory=os.path.join("templates"))
@@ -184,6 +276,22 @@ async def clasificar_y_evaluar_json(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# Nuevo endpoint para gráfica 3D
+@router.get("/graficar_superficie", response_class=StreamingResponse, tags=["Calculo Vectorial"])
+async def graficar_superficie(
+        A: float = 1.0, B: float = 1.0, C: float = 1.0,
+        D: float = 0.0, E: float = 0.0, F: float = 0.0,
+        G: float = 0.0, H: float = 0.0, I: float = 0.0,
+        J: float = 0.0
+):
+    ecuacion = {
+        "A": A, "B": B, "C": C, "D": D, "E": E, "F": F,
+        "G": G, "H": H, "I": I, "J": J
+    }
+    buf = generar_grafica_3d(ecuacion)
+    return StreamingResponse(buf, media_type="image/png")
+
+
 # Nuevo endpoint para editar registro
 @router.post("/editar_registro", response_class=JSONResponse, tags=["Calculo Vectorial"])
 async def editar_registro(
@@ -217,11 +325,10 @@ async def eliminar_registro(indice: int = Form(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.get("/leer_registros_calculo", response_class=JSONResponse, tags=["Calculo Vectorial"])
 async def leer_registros_calculo_endpoint():
-        """Endpoint para leer registros del CSV y devolverlos como JSON"""
-        registros = leer_registros_calculo()
-        return registros
+    return leer_registros_calculo()
 
 
 @router.get("/calculo_vectorial", response_class=HTMLResponse, tags=["Vistas"])
